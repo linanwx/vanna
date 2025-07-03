@@ -90,7 +90,7 @@ class VannaBase(ABC):
 
         return f"Respond in the {self.language} language."
 
-    def generate_sql(self, question: str, allow_llm_to_see_data=False, **kwargs) -> str:
+    def generate_sql(self, question: str, additional_prompt: Union[str, None] = None, allow_llm_to_see_data=False, **kwargs) -> str:
         """
         Example:
         ```python
@@ -294,7 +294,7 @@ class VannaBase(ABC):
             return new_question
 
         prompt = [
-            self.system_message("Your goal is to combine a sequence of questions into a singular question if they are related. If the second question does not relate to the first question and is fully self-contained, return the second question. Return just the new combined question with no additional explanations. The question should theoretically be answerable with a single SQL statement."),
+            self.system_message("Your goal is to combine a sequence of questions into a singular question that can be answered with a **single SQL statement** if they are related. If the second question does not relate to the first question and is fully self-contained, return the second question. Return just the new combined question with no additional explanations. The question should theoretically be answerable with a single SQL statement. Usually you could just return the second question."),
             self.user_message("First question: " + last_question + "\nSecond question: " + new_question),
         ]
 
@@ -763,7 +763,7 @@ class VannaBase(ABC):
         account: str,
         username: str,
         password: str,
-        database: str,
+        database: str = "",
         role: Union[str, None] = None,
         warehouse: Union[str, None] = None,
         **kwargs
@@ -817,6 +817,9 @@ class VannaBase(ABC):
             **kwargs
         )
 
+        # Store current database for switching capability
+        self.current_database = database
+
         def run_sql_snowflake(sql: str) -> pd.DataFrame:
             cs = conn.cursor()
 
@@ -825,7 +828,7 @@ class VannaBase(ABC):
 
             if warehouse is not None:
                 cs.execute(f"USE WAREHOUSE {warehouse}")
-            cs.execute(f"USE DATABASE {database}")
+            cs.execute(f"USE DATABASE {self.current_database}")
 
             cur = cs.execute(sql)
 
@@ -839,6 +842,28 @@ class VannaBase(ABC):
         self.dialect = "Snowflake SQL"
         self.run_sql = run_sql_snowflake
         self.run_sql_is_set = True
+        self._update_snowflake_documentation()
+
+    def _update_snowflake_documentation(self):
+        """Update static documentation with current database"""
+        self.static_documentation = f"""The system is connected to a Snowflake database.
+Database is '{self.current_database}'.
+Please use fully qualified names when generating SQL. A fully qualified name (FQN) specifies the complete hierarchy of the table or field in the format "{self.current_database}"."SCHEMA"."TABLE".
+"""
+
+    def switch_snowflake_database(self, database: str):
+        """
+        Switch to a different Snowflake database.
+        
+        Args:
+            database (str): The name of the database to switch to.
+        """
+        if not hasattr(self, 'current_database'):
+            raise ImproperlyConfigured("No Snowflake connection found. Please connect to Snowflake first.")
+        
+        self.current_database = database
+        self._update_snowflake_documentation()
+        self.log(f"Switched to database: {database}")
 
     def connect_to_sqlite(self, url: str, check_same_thread: bool = False,  **kwargs):
         """
@@ -1683,6 +1708,7 @@ class VannaBase(ABC):
     def ask(
         self,
         question: Union[str, None] = None,
+        additional_prompt: Union[str, None] = None,
         print_results: bool = True,
         auto_train: bool = True,
         visualize: bool = True,  # if False, will not generate plotly code
@@ -1705,6 +1731,7 @@ class VannaBase(ABC):
 
         Args:
             question (str): The question to ask.
+            additional_prompt (str): Additional prompt to add to the question.
             print_results (bool): Whether to print the results of the SQL query.
             auto_train (bool): Whether to automatically train Vanna.AI on the question and SQL query.
             visualize (bool): Whether to generate plotly code and display the plotly figure.
@@ -1717,7 +1744,7 @@ class VannaBase(ABC):
             question = input("Enter a question: ")
 
         try:
-            sql = self.generate_sql(question=question, allow_llm_to_see_data=allow_llm_to_see_data)
+            sql = self.generate_sql(question=question, allow_llm_to_see_data=allow_llm_to_see_data, additional_prompt=additional_prompt)
         except Exception as e:
             print(e)
             return None, None, None
@@ -1850,8 +1877,9 @@ class VannaBase(ABC):
 
     def _get_databases(self) -> List[str]:
         try:
-            print("Trying INFORMATION_SCHEMA.DATABASES")
+            print("Trying INFORMATION_SCHEMA.DATABASES... This may take a while")
             df_databases = self.run_sql("SELECT * FROM INFORMATION_SCHEMA.DATABASES")
+            print(f"df_databases: {df_databases}")
         except Exception as e:
             print(e)
             try:
@@ -1864,6 +1892,7 @@ class VannaBase(ABC):
         return df_databases["DATABASE_NAME"].unique().tolist()
 
     def _get_information_schema_tables(self, database: str) -> pd.DataFrame:
+        print(f"Getting information schema tables for {database}")
         df_tables = self.run_sql(f"SELECT * FROM {database}.INFORMATION_SCHEMA.TABLES")
 
         return df_tables
