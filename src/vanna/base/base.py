@@ -82,7 +82,8 @@ class VannaBase(ABC):
         self.max_tokens = self.config.get("max_tokens", 14000)
 
     def log(self, message: str, title: str = "Info"):
-        print(f"{title}: {message}")
+        # print(f"{title}: {message}")
+        pass
 
     def _response_language(self) -> str:
         if self.language is None:
