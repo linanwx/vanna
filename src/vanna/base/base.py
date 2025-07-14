@@ -1714,6 +1714,7 @@ Please use fully qualified names when generating SQL. A fully qualified name (FQ
         auto_train: bool = True,
         visualize: bool = True,  # if False, will not generate plotly code
         allow_llm_to_see_data: bool = False,
+        **kwargs
     ) -> Union[
         Tuple[
             Union[str, None],
@@ -1745,7 +1746,7 @@ Please use fully qualified names when generating SQL. A fully qualified name (FQ
             question = input("Enter a question: ")
 
         try:
-            sql = self.generate_sql(question=question, allow_llm_to_see_data=allow_llm_to_see_data, additional_prompt=additional_prompt)
+            sql = self.generate_sql(question=question, allow_llm_to_see_data=allow_llm_to_see_data, additional_prompt=additional_prompt, **kwargs)
         except Exception as e:
             print(e)
             return None, None, None
