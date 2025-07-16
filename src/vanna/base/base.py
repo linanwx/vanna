@@ -80,6 +80,7 @@ class VannaBase(ABC):
         self.dialect = self.config.get("dialect", "SQL")
         self.language = self.config.get("language", None)
         self.max_tokens = self.config.get("max_tokens", 14000)
+        self.db_connections = []
 
     def log(self, message: str, title: str = "Info"):
         # print(f"{title}: {message}")
@@ -820,6 +821,15 @@ class VannaBase(ABC):
 
         # Store current database for switching capability
         self.current_database = database
+        self.db_connections.append({
+            "type": "snowflake",
+            "connection": conn,
+            "account": account,
+            "username": username,
+            "database": database,
+            "role": role,
+            "warehouse": warehouse
+        })
 
         def run_sql_snowflake(sql: str) -> pd.DataFrame:
             cs = conn.cursor()
@@ -855,13 +865,13 @@ Please use fully qualified names when generating SQL. A fully qualified name (FQ
     def switch_snowflake_database(self, database: str):
         """
         Switch to a different Snowflake database.
-        
+
         Args:
             database (str): The name of the database to switch to.
         """
         if not hasattr(self, 'current_database'):
             raise ImproperlyConfigured("No Snowflake connection found. Please connect to Snowflake first.")
-        
+
         self.current_database = database
         self._update_snowflake_documentation()
         self.log(f"Switched to database: {database}")
@@ -2147,3 +2157,16 @@ Please use fully qualified names when generating SQL. A fully qualified name (FQ
             fig.update_layout(template="plotly_dark")
 
         return fig
+
+    def destroy(self):
+        """
+        Close all database connections that were opened by Vanna.AI.
+        """
+        for db_connection in self.db_connections:
+            if db_connection["type"] == "snowflake":
+                conn = db_connection["connection"]
+                try:
+                    conn.close()
+                except Exception as e:
+                    print(f"Error closing Snowflake connection: {e}")
+            # Add other database types if needed
