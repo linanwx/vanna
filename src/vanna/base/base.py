@@ -191,28 +191,6 @@ class VannaBase(ABC):
         - CREATE TABLE AS SELECT
         - Markdown code blocks
         """
-
-        # Match CREATE TABLE ... AS SELECT
-        sqls = re.findall(r"\bCREATE\s+TABLE\b.*?\bAS\b.*?;", llm_response, re.DOTALL | re.IGNORECASE)
-        if sqls:
-            sql = sqls[-1]
-            self.log(title="Extracted SQL", message=f"{sql}")
-            return sql
-
-        # Match WITH clause (CTEs)
-        sqls = re.findall(r"\bWITH\b .*?;", llm_response, re.DOTALL | re.IGNORECASE)
-        if sqls:
-            sql = sqls[-1]
-            self.log(title="Extracted SQL", message=f"{sql}")
-            return sql
-
-        # Match SELECT ... ;
-        sqls = re.findall(r"\bSELECT\b .*?;", llm_response, re.DOTALL | re.IGNORECASE)
-        if sqls:
-            sql = sqls[-1]
-            self.log(title="Extracted SQL", message=f"{sql}")
-            return sql
-
         # Match ```sql ... ``` blocks
         sqls = re.findall(r"```sql\s*\n(.*?)```", llm_response, re.DOTALL | re.IGNORECASE)
         if sqls:
@@ -226,6 +204,27 @@ class VannaBase(ABC):
             sql = sqls[-1].strip()
             self.log(title="Extracted SQL", message=f"{sql}")
             return sql
+            
+        # Match CREATE TABLE ... AS SELECT
+        # sqls = re.findall(r"\bCREATE\s+TABLE\b.*?\bAS\b.*?;", llm_response, re.DOTALL | re.IGNORECASE)
+        # if sqls:
+        #     sql = sqls[-1]
+        #     self.log(title="Extracted SQL", message=f"{sql}")
+        #     return sql
+
+        # Match WITH clause (CTEs)
+        # sqls = re.findall(r"\bWITH\b .*?;", llm_response, re.DOTALL | re.IGNORECASE)
+        # if sqls:
+        #     sql = sqls[-1]
+        #     self.log(title="Extracted SQL", message=f"{sql}")
+        #     return sql
+
+        # Match SELECT ... ;
+        # sqls = re.findall(r"\bSELECT\b .*?;", llm_response, re.DOTALL | re.IGNORECASE)
+        # if sqls:
+        #     sql = sqls[-1]
+        #     self.log(title="Extracted SQL", message=f"{sql}")
+        #     return sql
 
         return llm_response
 
